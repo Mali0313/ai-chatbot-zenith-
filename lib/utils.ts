@@ -46,18 +46,12 @@ export interface GroupedSessions {
 
 /**
  * Group sessions by Today, Yesterday, and Older.
- * Uses a stable fallback timestamp when in SSR/prerender to prevent build-time hydration mismatches.
  */
 export function groupSessionsByDate(
   sessions: ChatSession[],
   referenceDate?: Date
 ): GroupedSessions {
-  const ref =
-    referenceDate ||
-    (typeof window !== "undefined"
-      ? new Date()
-      : new Date("2026-11-21T00:00:00.000Z"));
-
+  const ref = referenceDate || new Date();
   const startOfToday = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate()).getTime();
   const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
 

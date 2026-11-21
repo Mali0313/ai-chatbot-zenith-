@@ -17,47 +17,48 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Lazy state initializers to avoid setState cascading render in effects
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const savedTheme = localStorage.getItem("theme");
-      if (savedTheme) return savedTheme !== "light";
-    }
-    return true;
-  });
-
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
-          }
-        }
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_DUMMY_SESSIONS;
-  });
-
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const savedId = localStorage.getItem(ACTIVE_SESSION_KEY);
-        if (savedId) return savedId;
-      } catch {
-        // fallback
-      }
-    }
-    return "session-1";
-  });
+  // Consistent initial state for both server and client initial render
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [sessions, setSessions] = useState<ChatSession[]>(INITIAL_DUMMY_SESSIONS);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>("session-1");
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isLoadedRef = useRef(false);
 
-  // Sync document class with initial theme
+  // Synchronize with localStorage on client mount (deferred via microtask to avoid hydration and effect warnings)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed: ChatSession[] = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          queueMicrotask(() => {
+            setSessions(parsed);
+          });
+        }
+      }
+
+      const savedActiveId = localStorage.getItem(ACTIVE_SESSION_KEY);
+      if (savedActiveId) {
+        queueMicrotask(() => {
+          setActiveSessionId(savedActiveId);
+        });
+      }
+
+      const savedTheme = localStorage.getItem("theme");
+      if (savedTheme) {
+        queueMicrotask(() => {
+          setIsDarkMode(savedTheme !== "light");
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to load initial data from localStorage:", e);
+    } finally {
+      isLoadedRef.current = true;
+    }
+  }, []);
+
+  // Sync document class with theme
   useEffect(() => {
     const root = document.documentElement;
     if (isDarkMode) {
@@ -67,8 +68,9 @@ export default function Home() {
     }
   }, [isDarkMode]);
 
-  // Persist sessions to localStorage
+  // Persist sessions to localStorage once loaded
   useEffect(() => {
+    if (!isLoadedRef.current) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
     } catch (err) {
@@ -76,8 +78,9 @@ export default function Home() {
     }
   }, [sessions]);
 
-  // Persist activeSessionId to localStorage
+  // Persist activeSessionId to localStorage once loaded
   useEffect(() => {
+    if (!isLoadedRef.current) return;
     try {
       if (activeSessionId) {
         localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId);

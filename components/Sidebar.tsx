@@ -16,6 +16,7 @@ import {
 import { BOT_NAME } from "@/lib/constants";
 import { ChatSession } from "@/lib/types";
 import { cn, groupSessionsByDate } from "@/lib/utils";
+import { useIsMounted } from "@/lib/hooks";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -46,11 +47,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const isMounted = useIsMounted();
 
-  // Purely compute grouped sessions with useMemo
+  // Compute grouped sessions only on client after hydration to avoid SSR mismatch
   const grouped = useMemo(() => {
+    if (!isMounted) {
+      return { today: [], yesterday: [], older: [] };
+    }
     return groupSessionsByDate(sessions);
-  }, [sessions]);
+  }, [sessions, isMounted]);
 
   const startRename = (session: ChatSession, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -175,6 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Left Sidebar */}
       <aside
+        suppressHydrationWarning
         className={cn(
           "fixed md:static inset-y-0 left-0 z-40 flex flex-col h-full w-64 md:w-64 transition-all duration-200 ease-in-out select-none",
           "bg-white dark:bg-[#0a0a0a]",
@@ -216,45 +222,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Grouped Past Chats List: Today / Yesterday / Older */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-3">
-          {sessions.length === 0 ? (
-            <div className="px-3 py-6 text-xs text-neutral-400 text-center italic">
-              No conversations yet. Start a new chat!
+        {!isMounted ? (
+          /* Initial matching SSR skeleton to guarantee zero hydration discrepancy */
+          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 select-none">
+              Past Chats
             </div>
-          ) : (
-            <>
-              {/* Today Group */}
-              {grouped.today.length > 0 && (
-                <div className="space-y-1">
-                  <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 select-none">
-                    Today
+            <div className="space-y-1.5 px-1">
+              <div className="h-8 bg-neutral-100 dark:bg-[#141414] rounded-lg animate-pulse" />
+              <div className="h-8 bg-neutral-100 dark:bg-[#141414] rounded-lg animate-pulse [animation-delay:0.1s]" />
+              <div className="h-8 bg-neutral-100 dark:bg-[#141414] rounded-lg animate-pulse [animation-delay:0.2s]" />
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-2 space-y-3">
+            {sessions.length === 0 ? (
+              <div className="px-3 py-6 text-xs text-neutral-400 text-center italic">
+                No conversations yet. Start a new chat!
+              </div>
+            ) : (
+              <>
+                {/* Today Group */}
+                {grouped.today.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 select-none">
+                      Today
+                    </div>
+                    {grouped.today.map(renderSessionItem)}
                   </div>
-                  {grouped.today.map(renderSessionItem)}
-                </div>
-              )}
+                )}
 
-              {/* Yesterday Group */}
-              {grouped.yesterday.length > 0 && (
-                <div className="space-y-1">
-                  <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 select-none">
-                    Yesterday
+                {/* Yesterday Group */}
+                {grouped.yesterday.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 select-none">
+                      Yesterday
+                    </div>
+                    {grouped.yesterday.map(renderSessionItem)}
                   </div>
-                  {grouped.yesterday.map(renderSessionItem)}
-                </div>
-              )}
+                )}
 
-              {/* Older Group */}
-              {grouped.older.length > 0 && (
-                <div className="space-y-1">
-                  <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 select-none">
-                    Older
+                {/* Older Group */}
+                {grouped.older.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 select-none">
+                      Older
+                    </div>
+                    {grouped.older.map(renderSessionItem)}
                   </div>
-                  {grouped.older.map(renderSessionItem)}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Sidebar Footer with Theme & Settings Modal Trigger */}
         <div className="p-3 border-t border-[#e5e5e5] dark:border-[#262626] flex flex-col gap-1.5 text-xs">
