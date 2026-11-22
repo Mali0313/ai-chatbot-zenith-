@@ -12,7 +12,7 @@ import {
   Image as ImageIcon,
   FileText,
 } from "lucide-react";
-import { BOT_NAME } from "@/lib/constants";
+import NovaLogo from "./NovaLogo";
 import { ChatMessage, ChatAttachment } from "@/lib/types";
 import { formatBytes } from "@/lib/utils";
 import CodeBlock from "./CodeBlock";
@@ -47,7 +47,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     if (!message.imageUrl) return;
     const a = document.createElement("a");
     a.href = message.imageUrl;
-    a.download = `zenith-${Date.now()}.jpg`;
+    a.download = `nova-${Date.now()}.jpg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -166,7 +166,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   if (message.error) {
     return (
       <div className="flex w-full justify-start items-start gap-3 sm:gap-4 py-3 px-3 sm:px-4">
-        <div className="shrink-0 w-7 h-7 rounded-full border border-red-500/40 bg-red-500/10 text-red-500 flex items-center justify-center font-mono text-xs font-semibold select-none">
+        <div className="shrink-0 w-7 h-7 rounded-full border border-red-500/40 bg-red-500/10 text-red-500 flex items-center justify-center select-none">
           <AlertCircle size={15} />
         </div>
 
@@ -199,9 +199,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   if (message.isImage && message.imageUrl) {
     return (
       <div className="group flex w-full justify-start items-start gap-3 sm:gap-4 py-3 px-3 sm:px-4">
-        {/* Small circular avatar icon */}
-        <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-mono text-xs font-semibold select-none shadow-xs mt-0.5">
-          {BOT_NAME.charAt(0)}
+        {/* Nova Avatar */}
+        <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center select-none shadow-xs mt-0.5">
+          <NovaLogo variant="icon" size={14} />
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col gap-2.5">
@@ -264,9 +264,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // AI Message: rendered with react-markdown & remark-gfm
   return (
     <div className="group flex w-full justify-start items-start gap-3 sm:gap-4 py-3 px-3 sm:px-4">
-      {/* Small circular avatar icon */}
-      <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-mono text-xs font-semibold select-none shadow-xs mt-0.5">
-        {BOT_NAME.charAt(0)}
+      {/* Nova Avatar */}
+      <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center select-none shadow-xs mt-0.5">
+        <NovaLogo variant="icon" size={14} />
       </div>
 
       {/* Message Body: No bubble, plain text with markdown formatting */}

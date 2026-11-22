@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Zenith AI Chatbot - Supabase Storage & Database Schema
+-- Nova AI Chatbot - Supabase Storage & Database Schema
 -- Run this script in the Supabase SQL Editor: https://supabase.com/dashboard/project/_/sql
 -- ==============================================================================
 

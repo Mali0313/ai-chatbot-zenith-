@@ -1,6 +1,6 @@
 import { ChatSession, SuggestionItem } from "./types";
 
-export const BOT_NAME = "Zenith";
+export const BOT_NAME = "Nova";
 
 export const SUGGESTION_CARDS: SuggestionItem[] = [
   {

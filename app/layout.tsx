@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth-context";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -9,23 +10,23 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Zenith — Intelligent Minimalist AI",
+  title: "Nova — Intelligent Minimalist AI",
   description:
-    "A clean, black-and-white conversational AI assistant powered by Google Gemini. Minimal, responsive, and distraction-free.",
-  keywords: ["AI Chatbot", "ChatGPT", "Gemini", "Next.js", "Minimalist", "Monochrome"],
-  authors: [{ name: "Zenith" }],
-  applicationName: "Zenith AI",
-  creator: "Zenith Team",
+    "A clean, black-and-white conversational AI assistant powered by Google Gemini and Supabase. Minimal, responsive, and distraction-free.",
+  keywords: ["Nova", "AI Chatbot", "ChatGPT", "Gemini", "Next.js", "Minimalist", "Monochrome"],
+  authors: [{ name: "Nova" }],
+  applicationName: "Nova AI",
+  creator: "Nova Team",
   openGraph: {
-    title: "Zenith — Intelligent Minimalist AI",
-    description: "A clean, black-and-white conversational AI assistant powered by Google Gemini.",
-    siteName: "Zenith AI",
+    title: "Nova — Intelligent Minimalist AI",
+    description: "A clean, modern conversational AI assistant powered by Google Gemini and Supabase.",
+    siteName: "Nova AI",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Zenith — Intelligent Minimalist AI",
-    description: "A clean, black-and-white conversational AI assistant powered by Google Gemini.",
+    title: "Nova — Intelligent Minimalist AI",
+    description: "A clean, modern conversational AI assistant powered by Google Gemini and Supabase.",
   },
 };
 
@@ -47,7 +48,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} h-full dark`} suppressHydrationWarning>
       <body className="h-full w-full bg-white text-black dark:bg-[#0a0a0a] dark:text-white font-sans antialiased overflow-hidden">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

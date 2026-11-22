@@ -15,8 +15,11 @@ import {
   deleteSessionFromSupabase,
 } from "@/lib/supabase";
 
-const STORAGE_KEY = "zenith_saved_sessions";
-const ACTIVE_SESSION_KEY = "zenith_active_session_id";
+
+const STORAGE_KEY = "nova_saved_sessions";
+const ACTIVE_SESSION_KEY = "nova_active_session_id";
+const LEGACY_STORAGE_KEY = "zenith_saved_sessions";
+const LEGACY_ACTIVE_KEY = "zenith_active_session_id";
 
 export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -36,7 +39,7 @@ export default function Home() {
   // Synchronize with localStorage on client mount (deferred via microtask to avoid hydration warnings)
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (stored) {
         const parsed: ChatSession[] = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -46,7 +49,7 @@ export default function Home() {
         }
       }
 
-      const savedActiveId = localStorage.getItem(ACTIVE_SESSION_KEY);
+      const savedActiveId = localStorage.getItem(ACTIVE_SESSION_KEY) || localStorage.getItem(LEGACY_ACTIVE_KEY);
       if (savedActiveId) {
         queueMicrotask(() => {
           setActiveSessionId(savedActiveId);

@@ -1,6 +1,6 @@
-# Zenith — Minimalist AI Chatbot
+# Nova — Intelligent Minimalist AI Chatbot
 
-A sleek, responsive, ChatGPT-style AI chatbot built with **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS v4**, and the **Google Gen AI SDK (`@google/genai`)**.
+A sleek, responsive, ChatGPT-style AI chatbot built with **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS v4**, **Supabase Auth & Storage**, and the **Google Gen AI SDK (`@google/genai`)**.
 
 Strictly monochrome: high-contrast dark mode (`#0a0a0a`) and light mode (`#ffffff`) with subtle grey structural dividers (`#262626` / `#e5e5e5`).
 
@@ -70,7 +70,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 Commit your project and push to a remote repository:
 ```bash
 git add .
-git commit -m "Initial commit for Zenith AI chatbot"
+git commit -m "Initial commit for Nova AI chatbot"
 git push origin main
 ```
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   MessageSquare,
   Plus,
@@ -12,11 +13,14 @@ import {
   Check,
   X,
   Settings,
+  LogOut,
+  LogIn,
 } from "lucide-react";
-import { BOT_NAME } from "@/lib/constants";
+import NovaLogo from "./NovaLogo";
 import { ChatSession } from "@/lib/types";
 import { cn, groupSessionsByDate } from "@/lib/utils";
 import { useIsMounted } from "@/lib/hooks";
+import { useAuth } from "@/lib/auth-context";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -48,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const isMounted = useIsMounted();
+  const { user, signOut } = useAuth();
 
   // Compute grouped sessions only on client after hydration to avoid SSR mismatch
   const grouped = useMemo(() => {
@@ -193,12 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Sidebar Header & New Chat */}
         <div className="p-3 flex flex-col gap-2.5 border-b border-[#e5e5e5] dark:border-[#262626]">
           <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2 font-semibold text-black dark:text-white">
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-black text-white dark:bg-white dark:text-black text-xs font-mono font-bold">
-                {BOT_NAME.charAt(0)}
-              </span>
-              <span className="text-sm font-semibold tracking-tight">{BOT_NAME}</span>
-            </div>
+            <NovaLogo variant="full" size={20} />
             <button
               onClick={onToggle}
               className="p-1.5 rounded-md text-neutral-500 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-[#1a1a1a] transition-colors cursor-pointer"
@@ -276,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Sidebar Footer with Theme & Settings Modal Trigger */}
+        {/* Sidebar Footer with Theme, Settings & User Profile */}
         <div className="p-3 border-t border-[#e5e5e5] dark:border-[#262626] flex flex-col gap-1.5 text-xs">
           {/* Light/Dark Mode Toggle Button */}
           <button
@@ -303,14 +303,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </button>
 
-          {/* User workspace badge */}
-          <div className="pt-2 border-t border-[#e5e5e5] dark:border-[#262626] flex items-center justify-between px-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded-full border border-[#e5e5e5] dark:border-[#262626] flex items-center justify-center text-[10px] font-mono bg-neutral-100 dark:bg-[#1a1a1a] text-black dark:text-white font-semibold">
-                U
+          {/* User Profile / Auth Area */}
+          <div className="pt-2 border-t border-[#e5e5e5] dark:border-[#262626]">
+            {user ? (
+              <div className="flex items-center justify-between px-1.5 py-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-6 h-6 rounded-full border border-[#e5e5e5] dark:border-[#262626] flex items-center justify-center text-[10px] font-mono bg-neutral-100 dark:bg-[#1a1a1a] text-black dark:text-white font-semibold shrink-0">
+                    {(user.user_metadata?.full_name || user.email || "U").charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex flex-col">
+                    <span className="text-xs text-neutral-800 dark:text-neutral-200 font-medium truncate max-w-[125px]">
+                      {user.user_metadata?.full_name || user.email?.split("@")[0] || "User"}
+                    </span>
+                    <span className="text-[10px] text-neutral-400 truncate max-w-[125px]">
+                      {user.email}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => signOut()}
+                  className="p-1.5 rounded-md text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-[#1f1f1f] transition-colors cursor-pointer"
+                  title="Sign out"
+                >
+                  <LogOut size={13} />
+                </button>
               </div>
-              <span className="text-xs text-neutral-700 dark:text-neutral-300 font-medium">Local Workspace</span>
-            </div>
+            ) : (
+              <div className="flex items-center justify-between px-1.5 py-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full border border-[#e5e5e5] dark:border-[#262626] flex items-center justify-center text-[10px] font-mono bg-neutral-100 dark:bg-[#1a1a1a] text-black dark:text-white font-semibold">
+                    G
+                  </div>
+                  <span className="text-xs text-neutral-700 dark:text-neutral-300 font-medium">Guest Mode</span>
+                </div>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md bg-black text-white dark:bg-white dark:text-black hover:opacity-90 transition-opacity"
+                >
+                  <LogIn size={11} />
+                  <span>Sign in</span>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </aside>

@@ -2,8 +2,9 @@
 
 import React, { useRef, useEffect } from "react";
 import { PanelLeft, Sparkles, Moon, Sun, Plus, Settings, Image as ImageIcon } from "lucide-react";
-import { BOT_NAME, SUGGESTION_CARDS } from "@/lib/constants";
+import { SUGGESTION_CARDS } from "@/lib/constants";
 import { ChatMessage, SuggestionItem, ChatAttachment } from "@/lib/types";
+import NovaLogo from "./NovaLogo";
 import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 
@@ -70,7 +71,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           )}
 
           <div className="flex items-center gap-2 truncate">
-            <span className="font-semibold text-sm tracking-tight">{BOT_NAME}</span>
+            <NovaLogo variant="full" size={18} />
             {activeChatTitle && (
               <>
                 <span className="text-neutral-400 dark:text-neutral-600 text-xs">/</span>
@@ -120,10 +121,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         {messages.length === 0 ? (
           /* Empty State: Centered Greeting & Suggestion Cards */
           <div className="flex flex-col items-center justify-center min-h-[65vh] sm:min-h-[70vh] max-w-2xl mx-auto px-4 text-center my-auto animate-in fade-in duration-200">
-            {/* Centered Circular Avatar */}
-            <div className="w-12 h-12 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-mono text-xl font-bold mb-4 shadow-xs select-none">
-              {BOT_NAME.charAt(0)}
-            </div>
+            {/* Centered Nova Star Logo */}
+            <NovaLogo variant="icon" size={48} className="mb-4" />
 
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-black dark:text-white mb-2">
               What can I help with today?
@@ -170,8 +169,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             {/* Image Generation Skeleton Loading State */}
             {isGeneratingImage && (
               <div className="flex items-start gap-3 sm:gap-4 py-3 px-3 sm:px-4 animate-in fade-in duration-200">
-                <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-mono text-xs font-semibold select-none shadow-xs mt-0.5">
-                  {BOT_NAME.charAt(0)}
+                <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center select-none shadow-xs mt-0.5">
+                  <NovaLogo variant="icon" size={14} />
                 </div>
                 <div className="w-full max-w-md aspect-[4/3] rounded-2xl border border-[#e5e5e5] dark:border-[#262626] bg-neutral-100 dark:bg-[#141414] animate-pulse flex flex-col items-center justify-center gap-2 shadow-xs">
                   <ImageIcon size={28} className="text-neutral-400 dark:text-neutral-600 animate-pulse" />
@@ -185,8 +184,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             {/* Text Stream Skeleton Loading Indicator (Waiting for first stream token) */}
             {isLoading && !isGeneratingImage && (
               <div className="flex items-start gap-3 sm:gap-4 py-3 px-3 sm:px-4 animate-in fade-in duration-200">
-                <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-mono text-xs font-semibold select-none shadow-xs mt-0.5">
-                  {BOT_NAME.charAt(0)}
+                <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center select-none shadow-xs mt-0.5">
+                  <NovaLogo variant="icon" size={14} />
                 </div>
                 <div className="flex-1 space-y-2 pt-1 max-w-md">
                   <div className="h-3 bg-neutral-200 dark:bg-[#1f1f1f] rounded-full w-5/6 animate-pulse" />
