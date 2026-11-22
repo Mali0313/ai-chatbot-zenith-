@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
-import { PanelLeft, Sparkles, Moon, Sun, Plus, Settings } from "lucide-react";
+import { PanelLeft, Sparkles, Moon, Sun, Plus, Settings, Image as ImageIcon } from "lucide-react";
 import { BOT_NAME, SUGGESTION_CARDS } from "@/lib/constants";
 import { ChatMessage, SuggestionItem } from "@/lib/types";
 import MessageBubble from "./MessageBubble";
@@ -9,19 +9,23 @@ import ChatInput from "./ChatInput";
 
 interface ChatWindowProps {
   messages: ChatMessage[];
-  onSendMessage: (content: string) => void;
+  onSendMessage: (content: string, isImage?: boolean) => void;
   onRetryMessage?: () => void;
   onRegenerateMessage?: () => void;
+  onRegenerateImage?: (prompt: string) => void;
   onStopGenerating?: () => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
   onNewChat: () => void;
   isLoading?: boolean;
   isGenerating?: boolean;
+  isGeneratingImage?: boolean;
   isDarkMode: boolean;
   onToggleTheme: () => void;
   onOpenSettings?: () => void;
   activeChatTitle?: string;
+  isImageMode: boolean;
+  onToggleImageMode: () => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -29,23 +33,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onSendMessage,
   onRetryMessage,
   onRegenerateMessage,
+  onRegenerateImage,
   onStopGenerating,
   onToggleSidebar,
   isSidebarOpen,
   onNewChat,
   isLoading = false,
   isGenerating = false,
+  isGeneratingImage = false,
   isDarkMode,
   onToggleTheme,
   onOpenSettings,
   activeChatTitle,
+  isImageMode,
+  onToggleImageMode,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to newest message smoothly
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading, isGenerating]);
+  }, [messages, isLoading, isGenerating, isGeneratingImage]);
 
   // Find index of the last assistant message
   const lastAssistantIndex = messages.map((m) => m.role).lastIndexOf("assistant");
@@ -114,7 +122,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Main Scrollable Messages Container */}
       <div className="flex-1 overflow-y-auto px-2 sm:px-4 py-4">
         {messages.length === 0 ? (
-          /* Empty State: Centered Greeting & 4 Suggestion Cards */
+          /* Empty State: Centered Greeting & Suggestion Cards */
           <div className="flex flex-col items-center justify-center min-h-[65vh] sm:min-h-[70vh] max-w-2xl mx-auto px-4 text-center my-auto animate-in fade-in duration-200">
             {/* Centered Circular Avatar */}
             <div className="w-12 h-12 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-mono text-xl font-bold mb-4 shadow-xs select-none">
@@ -128,17 +136,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               Choose a prompt below or start typing in the bottom input bar.
             </p>
 
-            {/* 4 Suggestion Cards Grid */}
+            {/* Suggestion Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 w-full max-w-xl text-left">
               {SUGGESTION_CARDS.map((card: SuggestionItem, index: number) => (
                 <button
                   key={index}
-                  onClick={() => onSendMessage(card.prompt)}
-                  disabled={isGenerating}
+                  onClick={() => onSendMessage(card.prompt, card.isImage)}
+                  disabled={isGenerating || isGeneratingImage}
                   className="p-3.5 rounded-xl border border-[#e5e5e5] dark:border-[#262626] bg-white dark:bg-[#0a0a0a] hover:bg-neutral-50 dark:hover:bg-[#141414] hover:border-black dark:hover:border-white transition-all text-xs flex flex-col gap-1 group shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center gap-2 font-medium text-black dark:text-white">
-                    <Sparkles size={13} className="shrink-0 text-neutral-400 group-hover:text-black dark:group-hover:text-white transition-colors" />
+                    {card.isImage ? (
+                      <ImageIcon size={13} className="shrink-0 text-neutral-400 group-hover:text-black dark:group-hover:text-white transition-colors" />
+                    ) : (
+                      <Sparkles size={13} className="shrink-0 text-neutral-400 group-hover:text-black dark:group-hover:text-white transition-colors" />
+                    )}
                     <span>{card.title}</span>
                   </div>
                   <span className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-1">
@@ -157,13 +169,29 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 message={message}
                 onRetry={onRetryMessage}
                 onRegenerate={onRegenerateMessage}
+                onRegenerateImage={onRegenerateImage}
                 isLast={idx === lastAssistantIndex}
-                isGenerating={isGenerating}
+                isGenerating={isGenerating || isGeneratingImage}
               />
             ))}
 
-            {/* Loading Skeleton Indicator (Waiting for first stream token) */}
-            {isLoading && (
+            {/* Image Generation Skeleton Loading State */}
+            {isGeneratingImage && (
+              <div className="flex items-start gap-3 sm:gap-4 py-3 px-3 sm:px-4 animate-in fade-in duration-200">
+                <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-mono text-xs font-semibold select-none shadow-xs mt-0.5">
+                  {BOT_NAME.charAt(0)}
+                </div>
+                <div className="w-full max-w-md aspect-[4/3] rounded-2xl border border-[#e5e5e5] dark:border-[#262626] bg-neutral-100 dark:bg-[#141414] animate-pulse flex flex-col items-center justify-center gap-2 shadow-xs">
+                  <ImageIcon size={28} className="text-neutral-400 dark:text-neutral-600 animate-pulse" />
+                  <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">
+                    Generating image...
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Text Stream Skeleton Loading Indicator (Waiting for first stream token) */}
+            {isLoading && !isGeneratingImage && (
               <div className="flex items-start gap-3 sm:gap-4 py-3 px-3 sm:px-4 animate-in fade-in duration-200">
                 <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-mono text-xs font-semibold select-none shadow-xs mt-0.5">
                   {BOT_NAME.charAt(0)}
@@ -184,9 +212,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Bottom Input Bar */}
       <ChatInput
         onSendMessage={onSendMessage}
-        disabled={isLoading || isGenerating}
-        isGenerating={isGenerating}
+        disabled={isLoading || isGenerating || isGeneratingImage}
+        isGenerating={isGenerating || isGeneratingImage}
         onStopGenerating={onStopGenerating}
+        isImageMode={isImageMode}
+        onToggleImageMode={onToggleImageMode}
       />
     </main>
   );

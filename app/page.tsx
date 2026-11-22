@@ -16,6 +16,8 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImageMode, setIsImageMode] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   // Consistent initial state for both server and client initial render
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
@@ -25,7 +27,7 @@ export default function Home() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const isLoadedRef = useRef(false);
 
-  // Synchronize with localStorage on client mount (deferred via microtask to avoid hydration and effect warnings)
+  // Synchronize with localStorage on client mount (deferred via microtask to avoid hydration warnings)
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -112,7 +114,7 @@ export default function Home() {
 
   // Start a new empty chat
   const handleNewChat = () => {
-    if (isGenerating) {
+    if (isGenerating || isGeneratingImage) {
       handleStopGenerating();
     }
     setActiveSessionId(null);
@@ -120,7 +122,7 @@ export default function Home() {
 
   // Select an existing past chat session (loads it)
   const handleSelectSession = (id: string) => {
-    if (isGenerating) {
+    if (isGenerating || isGeneratingImage) {
       handleStopGenerating();
     }
     setActiveSessionId(id);
@@ -140,7 +142,7 @@ export default function Home() {
   // Delete session
   const handleDeleteSession = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isGenerating && activeSessionId === id) {
+    if ((isGenerating || isGeneratingImage) && activeSessionId === id) {
       handleStopGenerating();
     }
 
@@ -155,7 +157,7 @@ export default function Home() {
 
   // Clear all chat sessions completely
   const handleClearAllChats = () => {
-    if (isGenerating) {
+    if (isGenerating || isGeneratingImage) {
       handleStopGenerating();
     }
     setSessions([]);
@@ -176,6 +178,7 @@ export default function Home() {
     }
     setIsLoading(false);
     setIsGenerating(false);
+    setIsGeneratingImage(false);
 
     if (activeSessionId) {
       setSessions((prev) =>
@@ -195,7 +198,7 @@ export default function Home() {
 
   // Retry sending the last message if an error occurred
   const handleRetryMessage = () => {
-    if (!activeSession || currentMessages.length === 0 || isGenerating) return;
+    if (!activeSession || currentMessages.length === 0 || isGenerating || isGeneratingImage) return;
 
     const reversed = [...currentMessages].reverse();
     const lastUserMsg = reversed.find((m) => m.role === "user");
@@ -210,15 +213,18 @@ export default function Home() {
       )
     );
 
-    handleSendMessage(lastUserMsg.content, true);
+    handleSendMessage(lastUserMsg.content, !!lastUserMsg.isImage, true);
   };
 
-  // Regenerate the last AI response
+  // Regenerate the last AI response (text or image)
   const handleRegenerateMessage = () => {
-    if (!activeSession || currentMessages.length === 0 || isGenerating) return;
+    if (!activeSession || currentMessages.length === 0 || isGenerating || isGeneratingImage) return;
 
     const lastAssistantIdx = currentMessages.map((m) => m.role).lastIndexOf("assistant");
     if (lastAssistantIdx === -1) return;
+
+    const lastAssistantMsg = currentMessages[lastAssistantIdx];
+    const isImageResponse = !!lastAssistantMsg.isImage;
 
     const messagesBefore = currentMessages.slice(0, lastAssistantIdx);
     const lastUserMsg = [...messagesBefore].reverse().find((m) => m.role === "user");
@@ -233,16 +239,24 @@ export default function Home() {
       )
     );
 
-    handleSendMessage(lastUserMsg.content, true);
+    handleSendMessage(lastUserMsg.content, isImageResponse, true);
   };
 
-  // Send a message and stream live from /api/chat with full conversation history
-  const handleSendMessage = async (content: string, isRetry: boolean = false) => {
-    if (isGenerating) return;
+  // Regenerate a specific image given its prompt
+  const handleRegenerateImage = (prompt: string) => {
+    if (isGenerating || isGeneratingImage) return;
+    handleSendMessage(prompt, true, false);
+  };
+
+  // Send a message (text or image generation request)
+  const handleSendMessage = async (
+    content: string,
+    isImageRequest: boolean = false,
+    isRetry: boolean = false
+  ) => {
+    if (isGenerating || isGeneratingImage) return;
 
     let targetSessionId = activeSessionId;
-    let historyForApi: { role: string; content: string }[] = [];
-
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -255,7 +269,155 @@ export default function Home() {
       role: "user",
       content,
       createdAt: nowIso,
+      isImage: isImageRequest,
     };
+
+    // --- Image Generation Flow ---
+    if (isImageRequest) {
+      const assistantMessageId = generateId();
+      const assistantPlaceholder: ChatMessage = {
+        id: assistantMessageId,
+        role: "assistant",
+        content,
+        createdAt: nowIso,
+        isImage: true,
+      };
+
+      if (!targetSessionId) {
+        const generatedTitle = "Image: " + generateTitleFromMessage(content);
+        targetSessionId = "session-" + Date.now();
+
+        const newSession: ChatSession = {
+          id: targetSessionId,
+          title: generatedTitle,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          messages: [userMessage, assistantPlaceholder],
+        };
+
+        setSessions((prev) => [newSession, ...prev]);
+        setActiveSessionId(targetSessionId);
+      } else {
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === targetSessionId
+              ? {
+                  ...s,
+                  messages: isRetry
+                    ? [...s.messages, assistantPlaceholder]
+                    : [...s.messages, userMessage, assistantPlaceholder],
+                  updatedAt: nowIso,
+                }
+              : s
+          )
+        );
+      }
+
+      setIsGenerating(true);
+      setIsGeneratingImage(true);
+
+      try {
+        const response = await fetch("/api/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({ prompt: content }),
+        });
+
+        if (!response.ok) {
+          let errorMsg = "Unable to generate image. Please try again.";
+          try {
+            const errJson = await response.json();
+            if (errJson.error) errorMsg = errJson.error;
+          } catch {
+            errorMsg = `Image generation error (${response.status}: ${response.statusText})`;
+          }
+
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === targetSessionId
+                ? {
+                    ...s,
+                    updatedAt: new Date().toISOString(),
+                    messages: s.messages.map((m) =>
+                      m.id === assistantMessageId
+                        ? { ...m, content: errorMsg, error: true }
+                        : m
+                    ),
+                  }
+                : s
+            )
+          );
+          return;
+        }
+
+        const data = await response.json();
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === targetSessionId
+              ? {
+                  ...s,
+                  updatedAt: new Date().toISOString(),
+                  messages: s.messages.map((m) =>
+                    m.id === assistantMessageId
+                      ? {
+                          ...m,
+                          imageUrl: data.imageUrl,
+                          content: data.prompt || content,
+                          isImage: true,
+                        }
+                      : m
+                  ),
+                }
+              : s
+          )
+        );
+      } catch (err: unknown) {
+        const isAbort = err instanceof Error && err.name === "AbortError";
+        if (isAbort) {
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === targetSessionId
+                ? {
+                    ...s,
+                    updatedAt: new Date().toISOString(),
+                    messages: s.messages.filter((m) => m.id !== assistantMessageId),
+                  }
+                : s
+            )
+          );
+        } else {
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === targetSessionId
+                ? {
+                    ...s,
+                    updatedAt: new Date().toISOString(),
+                    messages: s.messages.map((m) =>
+                      m.id === assistantMessageId
+                        ? {
+                            ...m,
+                            content:
+                              "Network error: Unable to connect to image generation service. Please check your connection and try again.",
+                            error: true,
+                          }
+                        : m
+                    ),
+                  }
+                : s
+            )
+          );
+        }
+      } finally {
+        setIsGenerating(false);
+        setIsGeneratingImage(false);
+        abortControllerRef.current = null;
+      }
+      return;
+    }
+
+    // --- Standard Text Streaming Chat Flow ---
+    let historyForApi: { role: string; content: string }[] = [];
 
     if (!targetSessionId) {
       const generatedTitle = generateTitleFromMessage(content);
@@ -503,16 +665,20 @@ export default function Home() {
         onSendMessage={handleSendMessage}
         onRetryMessage={handleRetryMessage}
         onRegenerateMessage={handleRegenerateMessage}
+        onRegenerateImage={handleRegenerateImage}
         onStopGenerating={handleStopGenerating}
         onToggleSidebar={() => setIsSidebarOpen(true)}
         isSidebarOpen={isSidebarOpen}
         onNewChat={handleNewChat}
         isLoading={isLoading}
         isGenerating={isGenerating}
+        isGeneratingImage={isGeneratingImage}
         isDarkMode={isDarkMode}
         onToggleTheme={handleToggleTheme}
         onOpenSettings={() => setIsSettingsOpen(true)}
         activeChatTitle={activeSession?.title}
+        isImageMode={isImageMode}
+        onToggleImageMode={() => setIsImageMode((prev) => !prev)}
       />
 
       {/* Settings Modal */}

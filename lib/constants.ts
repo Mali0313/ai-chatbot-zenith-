@@ -7,21 +7,25 @@ export const SUGGESTION_CARDS: SuggestionItem[] = [
     title: "Help me plan my day",
     subtitle: "Organize tasks and prioritize high-impact goals",
     prompt: "Help me plan my day. I have 3 major projects, two meetings, and want to make sure I finish my key priority.",
+    isImage: false,
   },
   {
-    title: "Brainstorm project ideas",
-    subtitle: "Explore innovative web apps and developer tools",
-    prompt: "Brainstorm 4 creative developer tooling or AI interface ideas with clean UI/UX.",
+    title: "Generate an image",
+    subtitle: "Minimalist black and white architectural sketch",
+    prompt: "Minimalist black and white architectural sketch of an ultramodern museum pavilion, clean geometric lines, high contrast, dramatic shadows",
+    isImage: true,
   },
   {
     title: "Explain a complex concept",
     subtitle: "Break down distributed consensus simply",
     prompt: "Explain how distributed consensus works in distributed databases, in simple clear language.",
+    isImage: false,
   },
   {
     title: "Write clean TypeScript",
     subtitle: "Type-safe utilities and robust error handling",
     prompt: "Write a type-safe TypeScript retry utility with exponential backoff and cancellation support.",
+    isImage: false,
   },
 ];
 

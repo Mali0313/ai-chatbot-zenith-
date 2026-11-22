@@ -5,6 +5,8 @@ export interface ChatMessage {
   role: MessageRole;
   content: string;
   createdAt: string;
+  imageUrl?: string;
+  isImage?: boolean;
   error?: boolean;
   isStreaming?: boolean;
 }
@@ -21,4 +23,5 @@ export interface SuggestionItem {
   title: string;
   subtitle: string;
   prompt: string;
+  isImage?: boolean;
 }

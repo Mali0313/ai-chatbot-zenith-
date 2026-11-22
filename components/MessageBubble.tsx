@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Check, Copy, AlertCircle, RotateCcw } from "lucide-react";
+import { Check, Copy, AlertCircle, RotateCcw, Download, Image as ImageIcon } from "lucide-react";
 import { BOT_NAME } from "@/lib/constants";
 import { ChatMessage } from "@/lib/types";
 import CodeBlock from "./CodeBlock";
@@ -12,6 +12,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
   onRetry?: () => void;
   onRegenerate?: () => void;
+  onRegenerateImage?: (prompt: string) => void;
   isLast?: boolean;
   isGenerating?: boolean;
 }
@@ -20,6 +21,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   onRetry,
   onRegenerate,
+  onRegenerateImage,
   isLast = false,
   isGenerating = false,
 }) => {
@@ -32,11 +34,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleDownload = () => {
+    if (!message.imageUrl) return;
+    const a = document.createElement("a");
+    a.href = message.imageUrl;
+    a.download = `zenith-${Date.now()}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   // User Message: right-aligned, white bubble with black text on dark mode
   if (isUser) {
     return (
       <div className="flex w-full justify-end py-2 px-3 sm:px-4">
         <div className="max-w-[85%] sm:max-w-[70%] rounded-2xl rounded-tr-xs px-4 py-2.5 text-sm sm:text-base leading-relaxed bg-black text-white dark:bg-white dark:text-black shadow-xs font-normal whitespace-pre-wrap break-words">
+          {message.isImage && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-mono opacity-80 mb-1 block">
+              <ImageIcon size={12} />
+              <span>Image request</span>
+            </span>
+          )}
           {message.content}
         </div>
       </div>
@@ -54,7 +72,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         <div className="flex-1 min-w-0 flex flex-col gap-2.5 text-sm sm:text-base leading-relaxed">
           <div className="p-3.5 rounded-xl border border-red-500/30 bg-red-500/5 text-neutral-800 dark:text-neutral-200 text-xs sm:text-sm whitespace-pre-wrap break-words">
             <span className="font-semibold block mb-1 text-red-600 dark:text-red-400">
-              Request encountered an error:
+              {message.isImage ? "Image generation failed:" : "Request encountered an error:"}
             </span>
             {message.content}
           </div>
@@ -67,10 +85,76 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border border-[#e5e5e5] dark:border-[#262626] bg-white dark:bg-[#0a0a0a] text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-[#1a1a1a] transition-all shadow-xs cursor-pointer"
               >
                 <RotateCcw size={13} />
-                <span>Retry message</span>
+                <span>Retry {message.isImage ? "image" : "message"}</span>
               </button>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // AI Message with Generated Image
+  if (message.isImage && message.imageUrl) {
+    return (
+      <div className="group flex w-full justify-start items-start gap-3 sm:gap-4 py-3 px-3 sm:px-4">
+        {/* Small circular avatar icon */}
+        <div className="shrink-0 w-7 h-7 rounded-full border border-[#e5e5e5] dark:border-[#262626] bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-mono text-xs font-semibold select-none shadow-xs mt-0.5">
+          {BOT_NAME.charAt(0)}
+        </div>
+
+        <div className="flex-1 min-w-0 flex flex-col gap-2.5">
+          {/* Prompt caption */}
+          {message.content && (
+            <div className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-300 font-medium leading-relaxed">
+              {message.content}
+            </div>
+          )}
+
+          {/* Generated Image with rounded corners & grey border */}
+          <div className="relative group/img max-w-lg w-full rounded-2xl overflow-hidden border border-[#e5e5e5] dark:border-[#262626] bg-neutral-100 dark:bg-[#141414] shadow-xs">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={message.imageUrl}
+              alt={message.content || "Generated image"}
+              className="w-full h-auto object-cover rounded-2xl"
+              loading="lazy"
+            />
+          </div>
+
+          {/* Action Toolbar: Download, Regenerate, Copy Prompt */}
+          <div className="flex items-center gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#e5e5e5] dark:border-[#262626] bg-white dark:bg-[#0a0a0a] text-xs text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-[#1a1a1a] transition-all shadow-xs cursor-pointer font-medium"
+              title="Download full image"
+            >
+              <Download size={13} />
+              <span>Download</span>
+            </button>
+
+            {onRegenerateImage && !isGenerating && (
+              <button
+                type="button"
+                onClick={() => onRegenerateImage(message.content)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#e5e5e5] dark:border-[#262626] bg-white dark:bg-[#0a0a0a] text-xs text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-[#1a1a1a] transition-all shadow-xs cursor-pointer font-medium"
+                title="Regenerate this image"
+              >
+                <RotateCcw size={13} />
+                <span>Regenerate</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-[#1a1a1a] transition-colors cursor-pointer"
+              title="Copy prompt"
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+            </button>
+          </div>
         </div>
       </div>
     );
