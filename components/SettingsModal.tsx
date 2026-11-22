@@ -143,7 +143,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>Model Engine</span>
               </span>
               <span className="font-mono text-black dark:text-white font-medium">
-                Gemini 2.5 Flash
+                Gemini 3.5 Flash
               </span>
             </div>
             <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400">

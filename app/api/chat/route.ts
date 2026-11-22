@@ -8,6 +8,14 @@ const MAX_MESSAGE_LENGTH = 4000;
 const MAX_MESSAGES_COUNT = 50;
 const MAX_OUTPUT_TOKENS = 2048; // Capped max tokens per response
 
+// Models prioritized by speed and current availability
+const CANDIDATE_MODELS = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-3.8-flash",
+];
+
 // In-memory sliding window rate limiter: 20 requests per minute per IP
 interface RateLimitRecord {
   count: number;
@@ -193,18 +201,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 7. Initialize Google Gen AI client with capped maxOutputTokens
+    // 7. Initialize Google Gen AI client with server API key
     const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
 
-    const responseStream = await ai.models.generateContentStream({
-      model: "gemini-2.5-flash",
-      contents,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.7,
-        maxOutputTokens: MAX_OUTPUT_TOKENS, // Capped max tokens per response
-      },
-    });
+    // Request stream with automatic model fallback for resilience
+    let responseStream = null;
+    let lastError: unknown = null;
+
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        responseStream = await ai.models.generateContentStream({
+          model,
+          contents,
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            temperature: 0.7,
+            maxOutputTokens: MAX_OUTPUT_TOKENS,
+          },
+        });
+        if (responseStream) {
+          break;
+        }
+      } catch (err: unknown) {
+        lastError = err;
+        console.warn(`Model ${model} was unavailable, trying next candidate...`);
+      }
+    }
+
+    if (!responseStream) {
+      throw lastError || new Error("Failed to initialize stream from AI provider.");
+    }
 
     // 8. Stream the response back to client using Web Streams API
     const encoder = new TextEncoder();
