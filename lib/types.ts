@@ -8,7 +8,9 @@ export interface ChatAttachment {
   size: number;
   type: AttachmentType;
   mimeType: string;
-  dataUrl: string; // base64 Data URL
+  dataUrl?: string; // base64 Data URL for instant local preview
+  url?: string; // Public Supabase Storage URL in bucket 'chat-uploads'
+  storagePath?: string; // Internal storage path in bucket
 }
 
 export interface ChatMessage {

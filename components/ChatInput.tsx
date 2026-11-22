@@ -10,6 +10,8 @@ import {
   FileText,
   X,
   AlertCircle,
+  Loader2,
+  CloudCheck,
 } from "lucide-react";
 import { BOT_NAME } from "@/lib/constants";
 import { ChatAttachment, AttachmentType } from "@/lib/types";
@@ -60,6 +62,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [uploadingIds, setUploadingIds] = useState<Record<string, boolean>>({});
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -123,6 +126,45 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     };
   }, [isMenuOpen]);
 
+  // Upload file to Supabase Storage in the background
+  const uploadFileToStorage = async (file: File, attachmentId: string, type: AttachmentType) => {
+    setUploadingIds((prev) => ({ ...prev, [attachmentId]: true }));
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", type);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAttachments((prev) =>
+          prev.map((att) =>
+            att.id === attachmentId
+              ? { ...att, url: data.url, storagePath: data.storagePath }
+              : att
+          )
+        );
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        if (errJson?.error && !errJson.error.includes("not configured")) {
+          console.warn("Storage upload note:", errJson.error);
+        }
+      }
+    } catch (uploadErr) {
+      console.warn("Storage upload request error:", uploadErr);
+    } finally {
+      setUploadingIds((prev) => {
+        const next = { ...prev };
+        delete next[attachmentId];
+        return next;
+      });
+    }
+  };
+
   // Handle file selection from inputs
   const handleFilesSelected = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -163,15 +205,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       }
     }
 
-    // Process valid files into base64 Data URLs
+    // Process valid files into base64 Data URLs & initiate Supabase Storage upload
     fileList.forEach((file) => {
+      const attachmentId = generateId();
       const reader = new FileReader();
+
       reader.onload = (loadEvt) => {
         const dataUrl = loadEvt.target?.result as string;
         if (!dataUrl) return;
 
         const newAttachment: ChatAttachment = {
-          id: generateId(),
+          id: attachmentId,
           name: file.name,
           size: file.size,
           type,
@@ -183,7 +227,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           if (prev.length >= MAX_FILES_PER_MESSAGE) return prev;
           return [...prev, newAttachment];
         });
+
+        // Upload to Supabase Storage bucket 'chat-uploads'
+        uploadFileToStorage(file, attachmentId, type);
       };
+
       reader.readAsDataURL(file);
     });
 
@@ -301,58 +349,80 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {/* Attachment Previews Tray (Above textarea inside form) */}
         {attachments.length > 0 && (
           <div className="flex items-center gap-2.5 px-3 pt-2.5 pb-1 overflow-x-auto scrollbar-thin">
-            {attachments.map((file) => (
-              <div key={file.id} className="relative shrink-0 group">
-                {file.type === "image" ? (
-                  <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-[#e5e5e5] dark:border-[#262626] bg-neutral-100 dark:bg-[#141414] shadow-xs">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={file.dataUrl}
-                      alt={file.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : file.type === "video" ? (
-                  <div className="flex items-center gap-2 px-2.5 py-1.5 h-14 rounded-lg border border-[#e5e5e5] dark:border-[#262626] bg-neutral-50 dark:bg-[#141414] shadow-xs max-w-[180px]">
-                    <div className="w-8 h-8 rounded-md bg-neutral-200 dark:bg-[#222] flex items-center justify-center shrink-0">
-                      <Film size={16} className="text-neutral-600 dark:text-neutral-300" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate text-black dark:text-white">
-                        {file.name}
-                      </p>
-                      <span className="text-[10px] text-neutral-400 font-mono">
-                        {formatBytes(file.size)}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 px-2.5 py-1.5 h-14 rounded-lg border border-[#e5e5e5] dark:border-[#262626] bg-neutral-50 dark:bg-[#141414] shadow-xs max-w-[180px]">
-                    <div className="w-8 h-8 rounded-md bg-neutral-200 dark:bg-[#222] flex items-center justify-center shrink-0">
-                      <FileText size={16} className="text-neutral-600 dark:text-neutral-300" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate text-black dark:text-white">
-                        {file.name}
-                      </p>
-                      <span className="text-[10px] text-neutral-400 font-mono">
-                        {formatBytes(file.size)}
-                      </span>
-                    </div>
-                  </div>
-                )}
+            {attachments.map((file) => {
+              const isUploading = Boolean(uploadingIds[file.id]);
+              const isCloudStored = Boolean(file.url);
 
-                {/* Remove Preview Button */}
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(file.id)}
-                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center hover:opacity-80 transition-opacity cursor-pointer shadow-xs"
-                  title="Remove file"
-                >
-                  <X size={10} strokeWidth={2.5} />
-                </button>
-              </div>
-            ))}
+              return (
+                <div key={file.id} className="relative shrink-0 group">
+                  {file.type === "image" ? (
+                    <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-[#e5e5e5] dark:border-[#262626] bg-neutral-100 dark:bg-[#141414] shadow-xs">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={file.url || file.dataUrl}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : file.type === "video" ? (
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 h-14 rounded-lg border border-[#e5e5e5] dark:border-[#262626] bg-neutral-50 dark:bg-[#141414] shadow-xs max-w-[180px]">
+                      <div className="w-8 h-8 rounded-md bg-neutral-200 dark:bg-[#222] flex items-center justify-center shrink-0">
+                        <Film size={16} className="text-neutral-600 dark:text-neutral-300" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate text-black dark:text-white">
+                          {file.name}
+                        </p>
+                        <span className="text-[10px] text-neutral-400 font-mono">
+                          {formatBytes(file.size)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 h-14 rounded-lg border border-[#e5e5e5] dark:border-[#262626] bg-neutral-50 dark:bg-[#141414] shadow-xs max-w-[180px]">
+                      <div className="w-8 h-8 rounded-md bg-neutral-200 dark:bg-[#222] flex items-center justify-center shrink-0">
+                        <FileText size={16} className="text-neutral-600 dark:text-neutral-300" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate text-black dark:text-white">
+                          {file.name}
+                        </p>
+                        <span className="text-[10px] text-neutral-400 font-mono">
+                          {formatBytes(file.size)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Uploading Status / Cloud Sync indicator */}
+                  {isUploading ? (
+                    <span
+                      className="absolute bottom-1 right-1 p-0.5 rounded-full bg-black/80 text-white dark:bg-white/80 dark:text-black"
+                      title="Uploading to Supabase Storage..."
+                    >
+                      <Loader2 size={10} className="animate-spin" />
+                    </span>
+                  ) : isCloudStored ? (
+                    <span
+                      className="absolute bottom-1 right-1 p-0.5 rounded-full bg-black/80 text-white dark:bg-white/80 dark:text-black"
+                      title="Uploaded to Supabase chat-uploads"
+                    >
+                      <CloudCheck size={10} />
+                    </span>
+                  ) : null}
+
+                  {/* Remove Preview Button */}
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(file.id)}
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center hover:opacity-80 transition-opacity cursor-pointer shadow-xs z-10"
+                    title="Remove file"
+                  >
+                    <X size={10} strokeWidth={2.5} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 

@@ -7,6 +7,13 @@ import SettingsModal from "@/components/SettingsModal";
 import { INITIAL_DUMMY_SESSIONS } from "@/lib/constants";
 import { ChatMessage, ChatSession, ChatAttachment } from "@/lib/types";
 import { generateId, generateTitleFromMessage } from "@/lib/utils";
+import {
+  isSupabaseConfigured,
+  saveSessionToSupabase,
+  saveMessageToSupabase,
+  fetchSessionsFromSupabase,
+  deleteSessionFromSupabase,
+} from "@/lib/supabase";
 
 const STORAGE_KEY = "zenith_saved_sessions";
 const ACTIVE_SESSION_KEY = "zenith_active_session_id";
@@ -56,6 +63,16 @@ export default function Home() {
       console.warn("Failed to load initial data from localStorage:", e);
     } finally {
       isLoadedRef.current = true;
+    }
+
+    // Attempt cloud database sync if Supabase credentials are configured
+    if (isSupabaseConfigured()) {
+      fetchSessionsFromSupabase().then((remoteSessions) => {
+        if (remoteSessions && remoteSessions.length > 0) {
+          setSessions(remoteSessions);
+          setActiveSessionId(remoteSessions[0].id);
+        }
+      });
     }
   }, []);
 
@@ -127,23 +144,28 @@ export default function Home() {
     setActiveSessionId(id);
   };
 
-  // Rename session
+  // Rename session (updates local + Supabase)
   const handleRenameSession = (id: string, newTitle: string) => {
     setSessions((prev) =>
-      prev.map((s) =>
-        s.id === id
-          ? { ...s, title: newTitle, updatedAt: new Date().toISOString() }
-          : s
-      )
+      prev.map((s) => {
+        if (s.id === id) {
+          const updated = { ...s, title: newTitle, updatedAt: new Date().toISOString() };
+          saveSessionToSupabase(updated);
+          return updated;
+        }
+        return s;
+      })
     );
   };
 
-  // Delete session
+  // Delete session (updates local + Supabase)
   const handleDeleteSession = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if ((isGenerating || isGeneratingImage) && activeSessionId === id) {
       handleStopGenerating();
     }
+
+    deleteSessionFromSupabase(id);
 
     setSessions((prev) => {
       const remaining = prev.filter((s) => s.id !== id);
@@ -159,6 +181,7 @@ export default function Home() {
     if (isGenerating || isGeneratingImage) {
       handleStopGenerating();
     }
+    sessions.forEach((s) => deleteSessionFromSupabase(s.id));
     setSessions([]);
     setActiveSessionId(null);
     try {
@@ -308,7 +331,10 @@ export default function Home() {
 
         setSessions((prev) => [newSession, ...prev]);
         setActiveSessionId(targetSessionId);
+        saveSessionToSupabase(newSession);
+        saveMessageToSupabase(targetSessionId, userMessage);
       } else {
+        saveMessageToSupabase(targetSessionId, userMessage);
         setSessions((prev) =>
           prev.map((s) =>
             s.id === targetSessionId
@@ -363,6 +389,19 @@ export default function Home() {
         }
 
         const data = await response.json();
+        const completedAssistantMsg: ChatMessage = {
+          id: assistantMessageId,
+          role: "assistant",
+          imageUrl: data.imageUrl,
+          content: data.prompt || content,
+          isImage: true,
+          createdAt: nowIso,
+        };
+
+        if (targetSessionId) {
+          saveMessageToSupabase(targetSessionId, completedAssistantMsg);
+        }
+
         setSessions((prev) =>
           prev.map((s) =>
             s.id === targetSessionId
@@ -370,14 +409,7 @@ export default function Home() {
                   ...s,
                   updatedAt: new Date().toISOString(),
                   messages: s.messages.map((m) =>
-                    m.id === assistantMessageId
-                      ? {
-                          ...m,
-                          imageUrl: data.imageUrl,
-                          content: data.prompt || content,
-                          isImage: true,
-                        }
-                      : m
+                    m.id === assistantMessageId ? completedAssistantMsg : m
                   ),
                 }
               : s
@@ -452,6 +484,9 @@ export default function Home() {
       setSessions((prev) => [newSession, ...prev]);
       setActiveSessionId(targetSessionId);
       historyForApi = [{ role: "user", content, attachments }];
+
+      saveSessionToSupabase(newSession);
+      saveMessageToSupabase(targetSessionId, userMessage);
     } else {
       const existing = sessions.find((s) => s.id === targetSessionId);
       const existingValidMessages = (existing?.messages || []).filter((m) => !m.error);
@@ -471,6 +506,8 @@ export default function Home() {
           })),
           { role: "user", content, attachments },
         ];
+
+        saveMessageToSupabase(targetSessionId, userMessage);
 
         setSessions((prev) =>
           prev.map((s) =>
@@ -593,7 +630,19 @@ export default function Home() {
         );
       }
 
-      // Finalize completed streaming message
+      // Finalize completed streaming message & save to Supabase
+      const finalAssistantMsg: ChatMessage = {
+        id: assistantMessageId,
+        role: "assistant",
+        content: accumulated,
+        createdAt: nowIso,
+        isStreaming: false,
+      };
+
+      if (targetSessionId) {
+        saveMessageToSupabase(targetSessionId, finalAssistantMsg);
+      }
+
       setSessions((prev) =>
         prev.map((s) =>
           s.id === targetSessionId
@@ -601,9 +650,7 @@ export default function Home() {
                 ...s,
                 updatedAt: new Date().toISOString(),
                 messages: s.messages.map((m) =>
-                  m.id === assistantMessageId
-                    ? { ...m, isStreaming: false }
-                    : m
+                  m.id === assistantMessageId ? finalAssistantMsg : m
                 ),
               }
             : s

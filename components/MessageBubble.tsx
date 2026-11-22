@@ -80,13 +80,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                         key={img.id}
                         className="relative rounded-xl overflow-hidden border border-white/20 dark:border-black/20 bg-neutral-900 dark:bg-neutral-100 aspect-video group/att cursor-pointer"
                         onClick={() => {
-                          const w = window.open("");
-                          w?.document.write(`<img src="${img.dataUrl}" style="max-width:100%"/>`);
+                          const link = img.url || img.dataUrl;
+                          if (link) window.open(link, "_blank");
                         }}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={img.dataUrl}
+                          src={img.url || img.dataUrl}
                           alt={img.name}
                           className="w-full h-full object-cover group-hover/att:scale-105 transition-transform"
                         />
@@ -106,7 +106,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                         className="rounded-xl overflow-hidden border border-white/20 dark:border-black/20 bg-neutral-950 dark:bg-neutral-50 p-1"
                       >
                         <video
-                          src={vid.dataUrl}
+                          src={vid.url || vid.dataUrl}
                           controls
                           className="w-full max-h-56 rounded-lg object-contain bg-black"
                         />
@@ -139,8 +139,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                           </div>
                         </div>
                         <a
-                          href={doc.dataUrl}
+                          href={doc.url || doc.dataUrl}
                           download={doc.name}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="p-1 rounded hover:bg-white/20 dark:hover:bg-black/20 transition-colors shrink-0"
                           title={`Download ${doc.name}`}
                         >
