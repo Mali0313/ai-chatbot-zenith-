@@ -17,6 +17,18 @@ export function formatTime(timestamp: string | Date): string {
 }
 
 /**
+ * Format raw bytes into human-readable string (KB, MB, GB).
+ */
+export function formatBytes(bytes: number, decimals: number = 1): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+
+/**
  * Generate a random UUID-like string.
  */
 export function generateId(): string {

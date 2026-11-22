@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
 const SYSTEM_INSTRUCTION =
-  "You are a helpful, friendly personal assistant. Give clear, concise answers and useful suggestions.";
+  "You are a helpful, friendly personal assistant. Give clear, concise answers and useful suggestions. When the user attaches images, videos, or documents, analyze and reference them carefully.";
 
-const MAX_MESSAGE_LENGTH = 4000;
+const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES_COUNT = 50;
 const MAX_OUTPUT_TOKENS = 2048; // Capped max tokens per response
 
-// Models prioritized by speed and current availability
+// Models prioritized by speed and multimodal capability
 const CANDIDATE_MODELS = [
   "gemini-3.5-flash-lite",
   "gemini-3.5-flash",
@@ -65,9 +65,19 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number; rese
   };
 }
 
+interface AttachmentPayload {
+  id: string;
+  name: string;
+  size: number;
+  type: "image" | "video" | "document";
+  mimeType: string;
+  dataUrl: string;
+}
+
 interface MessagePayload {
   role: "user" | "assistant" | "system";
   content: string;
+  attachments?: AttachmentPayload[];
 }
 
 export async function POST(req: NextRequest) {
@@ -172,25 +182,89 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 6. Convert messages to Gemini format (user & model turns)
-    const contents: { role: "user" | "model"; parts: { text: string }[] }[] = [];
+    // 6. Convert messages to Gemini format (user & model turns with Multimodal parts)
+    type GeminiPart =
+      | { text: string }
+      | { inlineData: { mimeType: string; data: string } };
+
+    const contents: Array<{
+      role: "user" | "model";
+      parts: GeminiPart[];
+    }> = [];
 
     for (const m of messages) {
       if (m.role === "system") continue;
       const role = m.role === "assistant" ? "model" : "user";
-      const text = m.content.trim();
-      if (!text) continue;
+      const text = (m.content || "").trim();
+      const attachments = m.attachments || [];
+
+      if (!text && attachments.length === 0) continue;
 
       // Gemini requires first content turn to be 'user'
       if (contents.length === 0 && role !== "user") {
         continue;
       }
 
+      const parts: GeminiPart[] = [];
+
+      // Process attachments if any
+      for (const att of attachments) {
+        if (!att.dataUrl) continue;
+        const base64Data = att.dataUrl.includes(",")
+          ? att.dataUrl.split(",")[1]
+          : att.dataUrl;
+
+        if (att.type === "image") {
+          parts.push({
+            inlineData: {
+              mimeType: att.mimeType || "image/jpeg",
+              data: base64Data,
+            },
+          });
+        } else if (att.type === "document" && att.mimeType === "application/pdf") {
+          parts.push({
+            inlineData: {
+              mimeType: "application/pdf",
+              data: base64Data,
+            },
+          });
+        } else if (
+          att.type === "document" &&
+          (att.mimeType.includes("text") ||
+            att.mimeType.includes("csv") ||
+            att.name.endsWith(".txt") ||
+            att.name.endsWith(".csv"))
+        ) {
+          try {
+            const decoded = Buffer.from(base64Data, "base64").toString("utf-8");
+            parts.push({
+              text: `[Attached file "${att.name}"]:\n\`\`\`\n${decoded.slice(0, 8000)}\n\`\`\``,
+            });
+          } catch {
+            parts.push({
+              text: `[User attached document: "${att.name}" (${att.mimeType})]`,
+            });
+          }
+        } else {
+          parts.push({
+            text: `[User attached ${att.type}: "${att.name}" (${att.mimeType})]`,
+          });
+        }
+      }
+
+      if (text) {
+        parts.push({ text });
+      } else if (parts.length > 0 && !parts.some((p) => "text" in p)) {
+        parts.push({
+          text: "Please analyze the attached file(s) and provide a helpful response or breakdown.",
+        });
+      }
+
       // Merge consecutive messages with the same role
       if (contents.length > 0 && contents[contents.length - 1].role === role) {
-        contents[contents.length - 1].parts[0].text += `\n\n${text}`;
+        contents[contents.length - 1].parts.push(...parts);
       } else {
-        contents.push({ role, parts: [{ text }] });
+        contents.push({ role, parts });
       }
     }
 

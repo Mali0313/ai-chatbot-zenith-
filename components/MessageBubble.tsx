@@ -3,9 +3,18 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Check, Copy, AlertCircle, RotateCcw, Download, Image as ImageIcon } from "lucide-react";
+import {
+  Check,
+  Copy,
+  AlertCircle,
+  RotateCcw,
+  Download,
+  Image as ImageIcon,
+  FileText,
+} from "lucide-react";
 import { BOT_NAME } from "@/lib/constants";
-import { ChatMessage } from "@/lib/types";
+import { ChatMessage, ChatAttachment } from "@/lib/types";
+import { formatBytes } from "@/lib/utils";
 import CodeBlock from "./CodeBlock";
 
 interface MessageBubbleProps {
@@ -46,16 +55,106 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   // User Message: right-aligned, white bubble with black text on dark mode
   if (isUser) {
+    const hasAttachments = message.attachments && message.attachments.length > 0;
+
     return (
       <div className="flex w-full justify-end py-2 px-3 sm:px-4">
-        <div className="max-w-[85%] sm:max-w-[70%] rounded-2xl rounded-tr-xs px-4 py-2.5 text-sm sm:text-base leading-relaxed bg-black text-white dark:bg-white dark:text-black shadow-xs font-normal whitespace-pre-wrap break-words">
+        <div className="max-w-[85%] sm:max-w-[70%] rounded-2xl rounded-tr-xs px-4 py-2.5 text-sm sm:text-base leading-relaxed bg-black text-white dark:bg-white dark:text-black shadow-xs font-normal whitespace-pre-wrap break-words flex flex-col gap-2">
           {message.isImage && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-mono opacity-80 mb-1 block">
+            <span className="inline-flex items-center gap-1.5 text-xs font-mono opacity-80 block">
               <ImageIcon size={12} />
               <span>Image request</span>
             </span>
           )}
-          {message.content}
+
+          {/* User Attached Files Rendering */}
+          {hasAttachments && (
+            <div className="flex flex-col gap-2">
+              {/* Image Attachments */}
+              {message.attachments!.some((a) => a.type === "image") && (
+                <div className="grid grid-cols-2 gap-2">
+                  {message.attachments!
+                    .filter((a) => a.type === "image")
+                    .map((img: ChatAttachment) => (
+                      <div
+                        key={img.id}
+                        className="relative rounded-xl overflow-hidden border border-white/20 dark:border-black/20 bg-neutral-900 dark:bg-neutral-100 aspect-video group/att cursor-pointer"
+                        onClick={() => {
+                          const w = window.open("");
+                          w?.document.write(`<img src="${img.dataUrl}" style="max-width:100%"/>`);
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={img.dataUrl}
+                          alt={img.name}
+                          className="w-full h-full object-cover group-hover/att:scale-105 transition-transform"
+                        />
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {/* Video Attachments */}
+              {message.attachments!.some((a) => a.type === "video") && (
+                <div className="flex flex-col gap-2">
+                  {message.attachments!
+                    .filter((a) => a.type === "video")
+                    .map((vid: ChatAttachment) => (
+                      <div
+                        key={vid.id}
+                        className="rounded-xl overflow-hidden border border-white/20 dark:border-black/20 bg-neutral-950 dark:bg-neutral-50 p-1"
+                      >
+                        <video
+                          src={vid.dataUrl}
+                          controls
+                          className="w-full max-h-56 rounded-lg object-contain bg-black"
+                        />
+                        <div className="px-2 py-1 text-[11px] opacity-80 flex items-center justify-between font-mono">
+                          <span className="truncate max-w-[200px]">{vid.name}</span>
+                          <span>{formatBytes(vid.size)}</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {/* Document Attachments */}
+              {message.attachments!.some((a) => a.type === "document") && (
+                <div className="flex flex-col gap-1.5">
+                  {message.attachments!
+                    .filter((a) => a.type === "document")
+                    .map((doc: ChatAttachment) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-white/20 dark:border-black/20 bg-white/10 dark:bg-black/10"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <FileText size={16} className="shrink-0 opacity-80" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium truncate">{doc.name}</p>
+                            <span className="text-[10px] opacity-70 font-mono">
+                              {formatBytes(doc.size)}
+                            </span>
+                          </div>
+                        </div>
+                        <a
+                          href={doc.dataUrl}
+                          download={doc.name}
+                          className="p-1 rounded hover:bg-white/20 dark:hover:bg-black/20 transition-colors shrink-0"
+                          title={`Download ${doc.name}`}
+                        >
+                          <Download size={13} />
+                        </a>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* User Message Text */}
+          {message.content && <div>{message.content}</div>}
         </div>
       </div>
     );
@@ -174,7 +273,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-              // Code blocks and inline code
               code({
                 className,
                 children,
@@ -202,7 +300,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   />
                 );
               },
-              // Headings
               h1({ children }) {
                 return (
                   <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-black dark:text-white mt-4 mb-2 first:mt-0">
@@ -231,11 +328,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   </h4>
                 );
               },
-              // Paragraphs
               p({ children }) {
                 return <p className="mb-3 leading-relaxed last:mb-0">{children}</p>;
               },
-              // Lists
               ul({ children }) {
                 return (
                   <ul className="list-disc pl-5 mb-3 space-y-1.5 marker:text-neutral-400 dark:marker:text-neutral-500">
@@ -253,7 +348,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               li({ children }) {
                 return <li className="leading-relaxed">{children}</li>;
               },
-              // Blockquote
               blockquote({ children }) {
                 return (
                   <blockquote className="border-l-2 border-[#262626] dark:border-[#e5e5e5] pl-4 py-0.5 my-3 italic text-neutral-600 dark:text-neutral-400">
@@ -261,7 +355,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   </blockquote>
                 );
               },
-              // Tables (GFM)
               table({ children }) {
                 return (
                   <div className="overflow-x-auto my-3 border border-[#e5e5e5] dark:border-[#262626] rounded-xl shadow-xs">
@@ -306,7 +399,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   </td>
                 );
               },
-              // Links
               a({ href, children }) {
                 return (
                   <a
@@ -319,7 +411,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   </a>
                 );
               },
-              // Bold & Italic
               strong({ children }) {
                 return (
                   <strong className="font-semibold text-black dark:text-white">
@@ -347,7 +438,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Action Toolbar on AI message (Copy and Regenerate) */}
         {!message.isStreaming && message.content && (
           <div className="flex items-center gap-2 mt-2 pt-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-            {/* Copy button on each AI message */}
             <button
               type="button"
               onClick={handleCopy}
@@ -358,7 +448,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <span className="text-[11px] font-mono">{copied ? "Copied" : "Copy"}</span>
             </button>
 
-            {/* Regenerate button on the last AI message */}
             {isLast && onRegenerate && !isGenerating && (
               <button
                 type="button"

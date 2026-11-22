@@ -3,13 +3,13 @@
 import React, { useRef, useEffect } from "react";
 import { PanelLeft, Sparkles, Moon, Sun, Plus, Settings, Image as ImageIcon } from "lucide-react";
 import { BOT_NAME, SUGGESTION_CARDS } from "@/lib/constants";
-import { ChatMessage, SuggestionItem } from "@/lib/types";
+import { ChatMessage, SuggestionItem, ChatAttachment } from "@/lib/types";
 import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 
 interface ChatWindowProps {
   messages: ChatMessage[];
-  onSendMessage: (content: string, isImage?: boolean) => void;
+  onSendMessage: (content: string, attachments?: ChatAttachment[]) => void;
   onRetryMessage?: () => void;
   onRegenerateMessage?: () => void;
   onRegenerateImage?: (prompt: string) => void;
@@ -24,8 +24,6 @@ interface ChatWindowProps {
   onToggleTheme: () => void;
   onOpenSettings?: () => void;
   activeChatTitle?: string;
-  isImageMode: boolean;
-  onToggleImageMode: () => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -45,8 +43,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onToggleTheme,
   onOpenSettings,
   activeChatTitle,
-  isImageMode,
-  onToggleImageMode,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -133,7 +129,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               What can I help with today?
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mb-8 max-w-md">
-              Choose a prompt below or start typing in the bottom input bar.
+              Attach files using the <span className="font-semibold">+</span> button or start typing below.
             </p>
 
             {/* Suggestion Cards Grid */}
@@ -141,16 +137,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               {SUGGESTION_CARDS.map((card: SuggestionItem, index: number) => (
                 <button
                   key={index}
-                  onClick={() => onSendMessage(card.prompt, card.isImage)}
+                  onClick={() => onSendMessage(card.prompt)}
                   disabled={isGenerating || isGeneratingImage}
                   className="p-3.5 rounded-xl border border-[#e5e5e5] dark:border-[#262626] bg-white dark:bg-[#0a0a0a] hover:bg-neutral-50 dark:hover:bg-[#141414] hover:border-black dark:hover:border-white transition-all text-xs flex flex-col gap-1 group shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center gap-2 font-medium text-black dark:text-white">
-                    {card.isImage ? (
-                      <ImageIcon size={13} className="shrink-0 text-neutral-400 group-hover:text-black dark:group-hover:text-white transition-colors" />
-                    ) : (
-                      <Sparkles size={13} className="shrink-0 text-neutral-400 group-hover:text-black dark:group-hover:text-white transition-colors" />
-                    )}
+                    <Sparkles size={13} className="shrink-0 text-neutral-400 group-hover:text-black dark:group-hover:text-white transition-colors" />
                     <span>{card.title}</span>
                   </div>
                   <span className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-1">
@@ -215,8 +207,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         disabled={isLoading || isGenerating || isGeneratingImage}
         isGenerating={isGenerating || isGeneratingImage}
         onStopGenerating={onStopGenerating}
-        isImageMode={isImageMode}
-        onToggleImageMode={onToggleImageMode}
       />
     </main>
   );

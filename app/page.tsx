@@ -5,7 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import ChatWindow from "@/components/ChatWindow";
 import SettingsModal from "@/components/SettingsModal";
 import { INITIAL_DUMMY_SESSIONS } from "@/lib/constants";
-import { ChatMessage, ChatSession } from "@/lib/types";
+import { ChatMessage, ChatSession, ChatAttachment } from "@/lib/types";
 import { generateId, generateTitleFromMessage } from "@/lib/utils";
 
 const STORAGE_KEY = "zenith_saved_sessions";
@@ -16,7 +16,6 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isImageMode, setIsImageMode] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   // Consistent initial state for both server and client initial render
@@ -213,7 +212,12 @@ export default function Home() {
       )
     );
 
-    handleSendMessage(lastUserMsg.content, !!lastUserMsg.isImage, true);
+    handleSendMessage(
+      lastUserMsg.content,
+      lastUserMsg.attachments || [],
+      !!lastUserMsg.isImage,
+      true
+    );
   };
 
   // Regenerate the last AI response (text or image)
@@ -239,18 +243,24 @@ export default function Home() {
       )
     );
 
-    handleSendMessage(lastUserMsg.content, isImageResponse, true);
+    handleSendMessage(
+      lastUserMsg.content,
+      lastUserMsg.attachments || [],
+      isImageResponse,
+      true
+    );
   };
 
   // Regenerate a specific image given its prompt
   const handleRegenerateImage = (prompt: string) => {
     if (isGenerating || isGeneratingImage) return;
-    handleSendMessage(prompt, true, false);
+    handleSendMessage(prompt, [], true, false);
   };
 
-  // Send a message (text or image generation request)
+  // Send a message (with optional attachments or image generation request)
   const handleSendMessage = async (
     content: string,
+    attachments: ChatAttachment[] = [],
     isImageRequest: boolean = false,
     isRetry: boolean = false
   ) => {
@@ -270,6 +280,7 @@ export default function Home() {
       content,
       createdAt: nowIso,
       isImage: isImageRequest,
+      attachments: attachments && attachments.length > 0 ? attachments : undefined,
     };
 
     // --- Image Generation Flow ---
@@ -416,11 +427,18 @@ export default function Home() {
       return;
     }
 
-    // --- Standard Text Streaming Chat Flow ---
-    let historyForApi: { role: string; content: string }[] = [];
+    // --- Standard Text & Multimodal Streaming Chat Flow ---
+    let historyForApi: {
+      role: string;
+      content: string;
+      attachments?: ChatAttachment[];
+    }[] = [];
 
     if (!targetSessionId) {
-      const generatedTitle = generateTitleFromMessage(content);
+      const titlePrompt =
+        content.trim() ||
+        (attachments[0]?.name ? `File: ${attachments[0].name}` : "New Conversation");
+      const generatedTitle = generateTitleFromMessage(titlePrompt);
       targetSessionId = "session-" + Date.now();
 
       const newSession: ChatSession = {
@@ -433,7 +451,7 @@ export default function Home() {
 
       setSessions((prev) => [newSession, ...prev]);
       setActiveSessionId(targetSessionId);
-      historyForApi = [{ role: "user", content }];
+      historyForApi = [{ role: "user", content, attachments }];
     } else {
       const existing = sessions.find((s) => s.id === targetSessionId);
       const existingValidMessages = (existing?.messages || []).filter((m) => !m.error);
@@ -442,11 +460,16 @@ export default function Home() {
         historyForApi = existingValidMessages.map((m) => ({
           role: m.role,
           content: m.content,
+          attachments: m.attachments,
         }));
       } else {
         historyForApi = [
-          ...existingValidMessages.map((m) => ({ role: m.role, content: m.content })),
-          { role: "user", content },
+          ...existingValidMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+            attachments: m.attachments,
+          })),
+          { role: "user", content, attachments },
         ];
 
         setSessions((prev) =>
@@ -662,7 +685,9 @@ export default function Home() {
       {/* Main Chat Area */}
       <ChatWindow
         messages={currentMessages}
-        onSendMessage={handleSendMessage}
+        onSendMessage={(content, attachments) =>
+          handleSendMessage(content, attachments || [], false)
+        }
         onRetryMessage={handleRetryMessage}
         onRegenerateMessage={handleRegenerateMessage}
         onRegenerateImage={handleRegenerateImage}
@@ -677,8 +702,6 @@ export default function Home() {
         onToggleTheme={handleToggleTheme}
         onOpenSettings={() => setIsSettingsOpen(true)}
         activeChatTitle={activeSession?.title}
-        isImageMode={isImageMode}
-        onToggleImageMode={() => setIsImageMode((prev) => !prev)}
       />
 
       {/* Settings Modal */}
